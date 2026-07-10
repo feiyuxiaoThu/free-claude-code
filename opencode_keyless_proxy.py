@@ -1,6 +1,6 @@
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 import uvicorn
 
 app = FastAPI()
@@ -9,6 +9,15 @@ client = httpx.AsyncClient(base_url="https://opencode.ai/zen/v1", timeout=httpx.
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"])
 async def proxy(request: Request, path: str):
     cleaned_path = path[3:] if path.startswith("v1/") else path
+    if cleaned_path == "models" and request.method == "GET":
+        r = await client.get("models")
+        data = r.json()
+        if "data" in data and isinstance(data["data"], list):
+            data["data"] = [
+                m for m in data["data"]
+                if m.get("id", "").endswith("-free") or m.get("id", "") == "big-pickle"
+            ]
+        return JSONResponse(content=data, status_code=r.status_code)
     # Get request body
     body = await request.body()
     

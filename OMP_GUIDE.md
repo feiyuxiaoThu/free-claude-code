@@ -1,6 +1,6 @@
 # 如何利用 OpenCode 免费模型驱动 OMP (Oh My Pi) 智能体
 
-本工程包含一个本地免密代理服务 (`opencode_keyless_proxy.py`)，可以让你的 OMP (Oh My Pi / Pi Coding Agent) 智能体免密调用 OpenCode 网关（`opencode.ai`）提供的所有免费大模型（如 `deepseek-v4-flash-free`、`hy3-free`、`qwen3.6-plus-free` 等）。
+本工程包含一个本地免密代理服务 (`opencode_keyless_proxy.py`)，可以让你的 OMP (Oh My Pi / Pi Coding Agent) 智能体免密调用 OpenCode 网关（`opencode.ai`）提供的所有免费大模型（如 `deepseek-v4-flash-free`、`hy3-free`、`nemotron-3-ultra-free` 等）。代理会拦截 `/v1/models` 请求，仅返回真正免费的模型（ID 以 `-free` 结尾或 `big-pickle`），剔除 OMP 内置目录里那些需要密钥的付费模型。
 
 ## 🚀 快速开始步骤
 
@@ -15,28 +15,16 @@ uv run python opencode_keyless_proxy.py
 
 ### 第二步：配置 OMP 的 `models.yml`
 
-打开你的 OMP 用户模型配置文件 `~/.omp/agent/models.yml`（如果不存在则新建），在 `providers` 下追加 `opencode-zen` 供应商及你想使用的免费模型列表，并将 `baseUrl` 指向本地代理：
+打开你的 OMP 用户模型配置文件 `~/.omp/agent/models.yml`（如果不存在则新建），在 `providers` 下追加 `opencode-free` 供应商（使用独立的自定义供应商名以避免 OMP 内置的 72 个付费模型目录干扰），并通过 `discovery` 从本地代理动态获取免费模型列表：
 
 ```yaml
 providers:
-  opencode-zen:
+  opencode-free:
     baseUrl: http://127.0.0.1:4000
     api: openai-completions
     apiKey: any-string # 使用任意虚拟 Key 避开 OMP 本地验证限制
-    models:
-      - id: deepseek-v4-flash-free
-        name: DeepSeek V4 Flash Free
-        contextWindow: 64000
-        maxTokens: 4096
-      - id: hy3-free
-        name: Tencent Hunyuan 3 (hy3-free)
-        contextWindow: 128000
-        maxTokens: 8192
-      - id: qwen3.6-plus-free
-        name: Qwen 3.6 Plus Free
-        contextWindow: 64000
-        maxTokens: 4096
-```
+    discovery:
+      type: openai-models-list
 
 ### 第三步：在 OMP 中使用模型
 
@@ -46,22 +34,22 @@ providers:
    ```bash
    omp models
    ```
-   你将在列表中看到 `opencode-zen` 下配置的所有免费模型。
+   你将在列表中看到 `opencode-free` 下自动发现的所有免费模型（例如 `deepseek-v4-flash-free`、`hy3-free`、`big-pickle` 等）。
 
 2. **单次命令调用测试**：
    ```bash
-   omp --model opencode-zen/deepseek-v4-flash-free -p "用两个字打招呼"
+  omp --model opencode-free/deepseek-v4-flash-free -p "用两个字打招呼"
    ```
 
 3. **设置 OMP 默认驱动模型**：
    若想将 OMP 会话的默认模型切换为 OpenCode 的免费模型，运行：
    ```bash
-   omp config set modelRoles.default opencode-zen/deepseek-v4-flash-free
-   ```
-   或者直接修改 OMP 的配置 `~/.omp/agent/config.yml`：
-   ```yaml
-   modelRoles:
-     default: opencode-zen/deepseek-v4-flash-free
-     smol: opencode-zen/deepseek-v4-flash-free
-     slow: opencode-zen/hy3-free
+  omp config set modelRoles.default opencode-free/deepseek-v4-flash-free
+  ```
+  或者直接修改 OMP 的配置 `~/.omp/agent/config.yml`：
+  ```yaml
+  modelRoles:
+    default: opencode-free/deepseek-v4-flash-free
+    smol: opencode-free/deepseek-v4-flash-free
+    slow: opencode-free/hy3-free
    ```
