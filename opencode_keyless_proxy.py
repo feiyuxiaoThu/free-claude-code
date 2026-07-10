@@ -1,23 +1,79 @@
+import asyncio
 import httpx
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 import uvicorn
 
-app = FastAPI()
+# How often to re-check the upstream free-model list (models change over time).
+REFRESH_INTERVAL_SECONDS = 600
+
 client = httpx.AsyncClient(base_url="https://opencode.ai/zen/v1", timeout=httpx.Timeout(120.0, connect=10.0))
+
+# Cached, filtered `/v1/models` payload (only free models).
+free_models_payload: dict = {"object": "list", "data": []}
+
+
+def _is_free(model_id: str) -> bool:
+    return model_id.endswith("-free") or model_id == "big-pickle"
+
+
+async def refresh_free_models(first_run: bool = False) -> None:
+    """Fetch the upstream model list, keep only free models, and log any changes."""
+    global free_models_payload
+    try:
+        r = await client.get("models")
+        r.raise_for_status()
+        payload = r.json()
+    except Exception as exc:  # noqa: BLE001 - surface but keep proxy running
+        print(f"[opencode-proxy] WARN: failed to fetch upstream /v1/models: {exc}")
+        return
+
+    upstream = payload.get("data", []) if isinstance(payload, dict) else []
+    new_free = [m for m in upstream if _is_free(m.get("id", ""))]
+    new_ids = {m["id"] for m in new_free}
+    old_ids = {m["id"] for m in free_models_payload.get("data", [])}
+
+    added = sorted(new_ids - old_ids)
+    removed = sorted(old_ids - new_ids)
+
+    if first_run:
+        print(f"[opencode-proxy] startup: loaded {len(new_free)} free model(s):")
+        for m in sorted(new_free, key=lambda x: x["id"]):
+            print(f"  - {m['id']}")
+    else:
+        if added:
+            print(f"[opencode-proxy] free models ADDED: {added}")
+        if removed:
+            print(f"[opencode-proxy] free models REMOVED: {removed}")
+        if not added and not removed:
+            print(f"[opencode-proxy] free model list unchanged ({len(new_free)} models)")
+
+    payload["data"] = new_free
+    free_models_payload = payload
+
+
+async def _refresh_loop() -> None:
+    while True:
+        await asyncio.sleep(REFRESH_INTERVAL_SECONDS)
+        await refresh_free_models()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await refresh_free_models(first_run=True)
+    asyncio.create_task(_refresh_loop())
+    yield
+    await client.aclose()
+
+
+app = FastAPI(lifespan=lifespan)
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"])
 async def proxy(request: Request, path: str):
     cleaned_path = path[3:] if path.startswith("v1/") else path
     if cleaned_path == "models" and request.method == "GET":
-        r = await client.get("models")
-        data = r.json()
-        if "data" in data and isinstance(data["data"], list):
-            data["data"] = [
-                m for m in data["data"]
-                if m.get("id", "").endswith("-free") or m.get("id", "") == "big-pickle"
-            ]
-        return JSONResponse(content=data, status_code=r.status_code)
+        return JSONResponse(content=free_models_payload, status_code=200)
     # Get request body
     body = await request.body()
     
