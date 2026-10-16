@@ -1,6 +1,6 @@
 # 如何利用 OpenCode 免费模型驱动 OMP (Oh My Pi) 智能体
 
-本工程包含一个本地免密代理服务 (`opencode_keyless_proxy.py`)，可以让你的 OMP (Oh My Pi / Pi Coding Agent) 智能体免密调用 OpenCode 网关（`opencode.ai`）提供的所有免费大模型（如 `deepseek-v4-flash-free`、`hy3-free`、`nemotron-3-ultra-free` 等）。代理会拦截 `/v1/models` 请求，仅返回真正免费的模型（ID 以 `-free` 结尾或 `big-pickle`），剔除 OMP 内置目录里那些需要密钥的付费模型。
+本工程包含一个本地免密代理服务 (`opencode_keyless_proxy.py`)，可以让你的 OMP (Oh My Pi / Pi Coding Agent) 智能体免密调用 OpenCode 网关（`opencode.ai`）提供的所有免费大模型（如 `deepseek-v4-flash-free`、`mimo-v2.5-free`、`nemotron-3-ultra-free` 等）。代理会拦截 `/v1/models` 请求，仅返回真正免费的模型（ID 以 `-free` 结尾或 `big-pickle`），剔除 OMP 内置目录里那些需要密钥的付费模型。
 
 ## 🚀 快速开始步骤
 
@@ -34,7 +34,7 @@ providers:
    ```bash
    omp models
    ```
-   你将在列表中看到 `opencode-free` 下自动发现的所有免费模型（例如 `deepseek-v4-flash-free`、`hy3-free`、`big-pickle` 等）。
+   你将在列表中看到 `opencode-free` 下自动发现的所有免费模型（例如 `deepseek-v4-flash-free`、`mimo-v2.5-free`、`big-pickle` 等）。
 
 2. **单次命令调用测试**：
    ```bash
@@ -51,5 +51,5 @@ providers:
   modelRoles:
     default: opencode-free/deepseek-v4-flash-free
     smol: opencode-free/deepseek-v4-flash-free
-    slow: opencode-free/hy3-free
+    slow: opencode-free/mimo-v2.5-free
    ```
